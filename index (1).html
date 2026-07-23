@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+  <title>ICMR Smart Navigation</title>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+      "mindar-image-three": "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"
+    }
+  }
+  </script>
+
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;}
+    :root{
+      --blue:#003580; --blue2:#0057B7; --green:#00C49A;
+      --yellow:#FFAA00; --purple:#8800CC; --white:#fff; --surface:#F0F4FF;
+      --text:#1A1A2E; --muted:#6B7A99;
+    }
+    body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--surface);height:100dvh;overflow:hidden;}
+
+    .screen{display:none;height:100dvh;flex-direction:column;}
+    .screen.active{display:flex;}
+    #s-ar.active{display:block !important;}
+
+    /* ── HOME ── */
+    #s-home{background:linear-gradient(160deg,var(--blue),var(--blue2));align-items:center;}
+    .home-top{width:100%;padding:44px 28px 18px;text-align:center;}
+    .logo-ring{width:60px;height:60px;border-radius:50%;background:rgba(255,255,255,.15);
+      display:flex;align-items:center;justify-content:center;margin:0 auto 10px;
+      border:2px solid rgba(255,255,255,.3);}
+    .logo-ring svg{width:32px;height:32px;}
+    .home-top h1{font-size:20px;font-weight:700;color:#fff;}
+    .home-top p{font-size:12.5px;color:rgba(255,255,255,.7);margin-top:4px;}
+    .home-card{background:#fff;border-radius:28px 28px 0 0;flex:1;width:100%;
+      padding:22px 20px;overflow-y:auto;}
+    .home-card h2{font-size:16.5px;font-weight:600;color:var(--text);margin-bottom:4px;}
+    .card-sub{font-size:12.5px;color:var(--muted);margin-bottom:14px;}
+    .dest-btn{background:var(--surface);border:2px solid transparent;border-radius:16px;
+      padding:14px 15px;display:flex;align-items:center;gap:12px;cursor:pointer;
+      transition:all .2s;margin-bottom:8px;-webkit-tap-highlight-color:transparent;width:100%;}
+    .dest-btn:active{transform:scale(.97);border-color:var(--blue2);background:#e8f0ff;}
+    .dest-icon{width:40px;height:40px;border-radius:11px;
+      background:linear-gradient(135deg,var(--blue),var(--blue2));
+      display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+    .dest-icon svg{width:20px;height:20px;}
+    .dest-info{flex:1;text-align:left;}
+    .dest-name{font-size:14px;font-weight:600;color:var(--text);}
+    .dest-room{font-size:11px;color:var(--muted);margin-top:1px;}
+    .dest-badges{display:flex;gap:5px;margin-top:5px;flex-wrap:wrap;}
+    .badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;letter-spacing:.2px;}
+    .badge-floor{color:var(--blue2);background:#E4ECFF;}
+    .badge-routes{color:var(--purple);background:#F2E4FF;}
+    .dest-chevron{font-size:20px;color:var(--muted);}
+    .tip-box{margin-top:14px;padding:13px;background:#FFF8E7;border-radius:12px;
+      border-left:4px solid var(--yellow);font-size:12px;color:#7A5900;line-height:1.5;}
+
+    /* ── ROUTE CHOICE (only for destinations with 2 possible routes) ── */
+    #s-route{background:linear-gradient(160deg,var(--blue),var(--blue2));
+      align-items:center;justify-content:center;gap:16px;text-align:center;padding:36px;}
+    #s-route h2{font-size:21px;font-weight:700;color:#fff;}
+    #route-dest-line{font-size:13.5px;color:var(--green);font-weight:700;margin-top:-8px;}
+    #s-route p.hint{font-size:13px;color:rgba(255,255,255,.7);max-width:280px;line-height:1.5;}
+    .route-btn{width:100%;max-width:300px;background:rgba(255,255,255,.1);
+      border:2px solid rgba(255,255,255,.25);border-radius:16px;padding:18px;
+      display:flex;align-items:center;gap:14px;cursor:pointer;text-align:left;
+      -webkit-tap-highlight-color:transparent;}
+    .route-btn:active{background:rgba(255,255,255,.2);}
+    .route-emoji{font-size:28px;}
+    .route-btn strong{display:block;font-size:15px;color:#fff;}
+    .route-btn span{font-size:12px;color:rgba(255,255,255,.65);}
+
+    /* ── PERMISSION SCREEN ── */
+    #s-perm{background:linear-gradient(160deg,var(--blue),var(--blue2));
+      align-items:center;justify-content:center;gap:20px;text-align:center;padding:40px;}
+    .perm-icon{width:92px;height:92px;border-radius:50%;background:rgba(255,255,255,.1);
+      display:flex;align-items:center;justify-content:center;
+      border:3px solid rgba(255,255,255,.25);}
+    .perm-icon svg{width:46px;height:46px;}
+    #s-perm h2{font-size:22px;font-weight:700;color:#fff;}
+    #s-perm p{font-size:13.5px;color:rgba(255,255,255,.75);max-width:290px;line-height:1.6;}
+    #perm-dest-line{font-size:13px;color:var(--green);font-weight:700;margin-top:-8px;}
+    .btn-allow{background:var(--green);color:#fff;border:none;border-radius:14px;
+      padding:16px 0;font-size:15.5px;font-weight:700;cursor:pointer;width:100%;max-width:300px;
+      -webkit-tap-highlight-color:transparent;transition:opacity .15s;}
+    .btn-allow:active{opacity:.85;}
+    .perm-note{font-size:11.5px;color:rgba(255,255,255,.45);max-width:270px;line-height:1.5;}
+
+    /* ── LOADING ── */
+    #s-loading{background:var(--blue);align-items:center;justify-content:center;
+      gap:18px;text-align:center;padding:40px;}
+    .spinner{width:56px;height:56px;border:5px solid rgba(255,255,255,.2);
+      border-top-color:var(--green);border-radius:50%;animation:spin 1s linear infinite;}
+    @keyframes spin{to{transform:rotate(360deg);}}
+    #s-loading h2{font-size:19px;font-weight:700;color:#fff;}
+    #s-loading p{font-size:13.5px;color:rgba(255,255,255,.7);max-width:280px;line-height:1.5;}
+
+    /* ── AR SCENE ── */
+    #s-ar{position:relative;background:#000;width:100%;height:100dvh;overflow:hidden;}
+    #ar-container{position:absolute;inset:0;width:100%;height:100%;}
+    #ar-container video, #ar-container canvas{
+      position:absolute !important; top:0 !important; left:0 !important;
+      width:100% !important; height:100% !important; object-fit:cover !important;
+    }
+    #hud{position:absolute;inset:0;pointer-events:none;z-index:999;}
+    #hud-top{position:absolute;top:0;left:0;right:0;padding:42px 18px 18px;
+      background:linear-gradient(to bottom,rgba(0,0,0,.72) 0%,transparent 100%);
+      pointer-events:none;}
+    #floor-pill{display:inline-flex;align-items:center;gap:5px;margin-bottom:8px;
+      background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);
+      border-radius:20px;padding:3px 11px;font-size:11px;font-weight:700;color:#fff;}
+    #step-label{font-size:10.5px;font-weight:700;color:rgba(255,255,255,.6);
+      text-transform:uppercase;letter-spacing:1.2px;margin-bottom:4px;}
+    #step-instr{font-size:18.5px;font-weight:800;color:#fff;line-height:1.25;}
+    #dist-pill{display:inline-flex;align-items:center;gap:6px;margin-top:8px;
+      background:rgba(0,196,154,.2);border:1px solid rgba(0,196,154,.5);
+      border-radius:20px;padding:4px 12px;font-size:12.5px;font-weight:600;color:var(--green);}
+    #hud-bottom{position:absolute;bottom:0;left:0;right:0;padding:18px 22px 36px;
+      background:linear-gradient(to top,rgba(0,0,0,.75) 0%,transparent 100%);
+      pointer-events:none;}
+    #scan-prompt{background:rgba(0,53,128,.85);border:1.5px solid rgba(255,255,255,.25);
+      border-radius:14px;padding:13px 16px;text-align:center;}
+    #scan-prompt p{font-size:13.5px;font-weight:600;color:#fff;line-height:1.4;}
+    #scan-prompt span{font-size:11.5px;color:rgba(255,255,255,.65);}
+    #detect-flash{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+      background:rgba(0,196,154,.92);border-radius:16px;padding:14px 26px;
+      text-align:center;opacity:0;transition:opacity .3s;pointer-events:none;max-width:82%;}
+    #detect-flash p{font-size:17px;font-weight:800;color:#fff;}
+    #detect-flash span{font-size:12.5px;color:rgba(255,255,255,.85);}
+    #detect-flash.show{opacity:1;}
+    #prog-dots{display:flex;gap:6px;justify-content:center;margin-bottom:12px;flex-wrap:wrap;}
+    .dot{width:8px;height:8px;border-radius:4px;background:rgba(255,255,255,.3);transition:all .3s;}
+    .dot.active{width:24px;background:var(--green);}
+    .dot.done{background:rgba(0,196,154,.5);}
+
+    /* ── TRANSIT MODAL (used for both lift and stairs — no 3D arrow makes
+         sense while inside a lift or on a staircase) ── */
+    #transit-modal{position:absolute;inset:0;background:rgba(0,20,50,.88);
+      display:none;align-items:center;justify-content:center;z-index:1200;
+      pointer-events:auto;padding:30px;}
+    #transit-modal.show{display:flex;}
+    .transit-card{background:#fff;border-radius:22px;padding:30px 24px;text-align:center;
+      max-width:320px;width:100%;}
+    .transit-emoji{font-size:44px;margin-bottom:10px;}
+    .transit-card h3{font-size:18.5px;font-weight:800;color:var(--blue);margin-bottom:8px;}
+    .transit-card p{font-size:13px;color:var(--muted);line-height:1.55;margin-bottom:18px;}
+    .transit-card button{background:var(--blue2);color:#fff;border:none;border-radius:12px;
+      padding:13px 0;width:100%;font-size:14px;font-weight:700;cursor:pointer;}
+
+    /* ── ARRIVED ── */
+    #s-arrived{background:linear-gradient(160deg,#003580,#005a9e);
+      align-items:center;justify-content:center;padding:40px 28px;text-align:center;gap:14px;}
+    .arrived-icon{width:96px;height:96px;border-radius:50%;background:rgba(0,196,154,.2);
+      display:flex;align-items:center;justify-content:center;
+      border:3px solid var(--green);margin-bottom:6px;}
+    .arrived-icon svg{width:50px;height:50px;}
+    #s-arrived h2{font-size:25px;font-weight:800;color:#fff;}
+    .arr-name{font-size:18.5px;color:var(--green);font-weight:700;margin-top:4px;}
+    .arr-room{font-size:14px;color:rgba(255,255,255,.8);font-weight:500;margin-top:2px;}
+    .arr-sub{font-size:13.5px;color:rgba(255,255,255,.65);line-height:1.5;margin-top:6px;}
+    .btn-restart{margin-top:18px;background:rgba(255,255,255,.12);color:#fff;
+      border:2px solid rgba(255,255,255,.25);border-radius:14px;
+      padding:14px 32px;font-size:14.5px;font-weight:600;cursor:pointer;}
+  </style>
+</head>
+<body>
+
+<script>
+  // ═══════════════════════════════════════════════════════════════
+  // CLASSIC SCRIPT (not a module) — always works even if the AR
+  // module below fails to load. Owns Home / Route-choice / Permission
+  // screen buttons.
+  //
+  // ★★★ THIS IS THE ONLY PLACE YOU NEED TO EDIT DESTINATION NAMES ★★★
+  // "room" can be left as an empty string '' if you don't want a
+  // second line under the name. "routes:true" means this destination
+  // is reachable two ways (stairs or lift) and will show the route
+  // choice screen; leave it false/omitted for single-route destinations.
+  // ═══════════════════════════════════════════════════════════════
+  const DEST_DISPLAY = {
+    d1: { name:'Location 1', room:'', floor:'1st Floor',    routes:true  },
+    d2: { name:'Location 2', room:'', floor:'1st Floor',    routes:true  },
+    d3: { name:'Location 3', room:'', floor:'Ground Floor', routes:false },
+    d4: { name:'Location 4', room:'', floor:'2nd Floor',    routes:false },
+    d5: { name:'Location 5', room:'', floor:'2nd Floor',    routes:false },
+    d6: { name:'Location 6', room:'', floor:'2nd Floor',    routes:false }
+  };
+  window.DEST_DISPLAY = DEST_DISPLAY; // exposed so the AR module can read names/rooms too
+
+  let selectedDestId = null;
+  let selectedRoute = null; // 'stairs' | 'lift' | null
+
+  function showScreen(id){
+    document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+
+  function renderDestList(){
+    const wrap = document.getElementById('dest-list');
+    let html = '';
+    Object.keys(DEST_DISPLAY).forEach(id => {
+      const d = DEST_DISPLAY[id];
+      html += `
+        <button class="dest-btn" onclick="selectDest('${id}')">
+          <div class="dest-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
+          <div class="dest-info">
+            <div class="dest-name">${d.name}</div>
+            ${d.room ? `<div class="dest-room">${d.room}</div>` : ''}
+            <div class="dest-badges">
+              <span class="badge badge-floor">${d.floor.toUpperCase()}</span>
+              ${d.routes ? '<span class="badge badge-routes">2 WAYS TO REACH</span>' : ''}
+            </div>
+          </div>
+          <div class="dest-chevron">›</div>
+        </button>`;
+    });
+    wrap.innerHTML = html;
+  }
+  document.addEventListener('DOMContentLoaded', renderDestList);
+
+  function selectDest(id){
+    selectedDestId = id;
+    selectedRoute = null;
+    const d = DEST_DISPLAY[id];
+    document.getElementById('perm-dest-line').textContent = 'To: ' + d.name;
+
+    if (d.routes) {
+      document.getElementById('route-dest-line').textContent = d.name;
+      showScreen('s-route');
+    } else {
+      showScreen('s-perm');
+    }
+  }
+
+  function selectRoute(route){
+    selectedRoute = route;
+    showScreen('s-perm');
+  }
+
+  async function requestCameraAndStart(){
+    try {
+      const testStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+        audio: false
+      });
+      testStream.getTracks().forEach(t => t.stop());
+      showScreen('s-loading');
+      setTimeout(() => {
+        if (window.initAR) { window.initAR(selectedDestId, selectedRoute); }
+        else {
+          alert('AR engine failed to load. Please check your internet connection and reload the page.');
+          showScreen('s-perm');
+        }
+      }, 400);
+    } catch(err) {
+      alert('Camera access was denied.\n\nTo fix this:\n1. Tap the camera icon in your browser address bar\n2. Select "Allow"\n3. Refresh the page and try again.');
+    }
+  }
+
+  function dismissTransitModal(){
+    document.getElementById('transit-modal').classList.remove('show');
+  }
+
+  function restart(){
+    if (window.stopAR) window.stopAR();
+    selectedDestId = null;
+    selectedRoute = null;
+    showScreen('s-home');
+  }
+</script>
+
+<!-- ═══════════════════════════════ -->
+<!-- SCREEN 1 — HOME / DESTINATION  -->
+<!-- ═══════════════════════════════ -->
+<div id="s-home" class="screen active">
+  <div class="home-top">
+    <div class="logo-ring">
+      <svg viewBox="0 0 38 38" fill="none">
+        <circle cx="19" cy="19" r="15" stroke="white" stroke-width="2"/>
+        <path d="M19 9v11l7 4" stroke="white" stroke-width="2.2" stroke-linecap="round"/>
+        <circle cx="19" cy="19" r="2.5" fill="white"/>
+      </svg>
+    </div>
+    <h1>ICMR Smart Navigation</h1>
+    <p>AR-guided indoor navigation • ICMR HQ</p>
+  </div>
+
+  <div class="home-card">
+    <h2>Where do you need to go?</h2>
+    <p class="card-sub">Select your destination below</p>
+
+    <div id="dest-list"><!-- populated by renderDestList() from DEST_DISPLAY above --></div>
+
+    <div class="tip-box">
+      📍 <strong>Before you start:</strong> Stand at the <strong>main entrance gate</strong> and point your camera toward the wall — the marker is picked up from a few metres away, no need to scan up close.
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ -->
+<!-- SCREEN 2 — ROUTE CHOICE (Location 1 & 2 only) -->
+<!-- ═══════════════════════════════ -->
+<div id="s-route" class="screen">
+  <h2>Choose your route</h2>
+  <div id="route-dest-line">—</div>
+  <p class="hint">This location can be reached two ways. Pick whichever suits you.</p>
+
+  <button class="route-btn" onclick="selectRoute('stairs')">
+    <div class="route-emoji">🪜</div>
+    <div>
+      <strong>Via Stairs</strong>
+      <span>Fastest — stairs are just left of reception</span>
+    </div>
+  </button>
+
+  <button class="route-btn" onclick="selectRoute('lift')">
+    <div class="route-emoji">🛗</div>
+    <div>
+      <strong>Via Lift</strong>
+      <span>Easier if you'd rather not use stairs</span>
+    </div>
+  </button>
+</div>
+
+<!-- ═══════════════════════════════ -->
+<!-- SCREEN 3 — CAMERA PERMISSION   -->
+<!-- ═══════════════════════════════ -->
+<div id="s-perm" class="screen">
+  <div class="perm-icon">
+    <svg viewBox="0 0 50 50" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="10" y="16" width="30" height="24" rx="4"/>
+      <circle cx="25" cy="28" r="6"/>
+      <circle cx="25" cy="28" r="2.5" fill="white" stroke="none"/>
+      <path d="M20 16v-4a5 5 0 0 1 10 0v4"/>
+      <rect x="32" y="19" width="5" height="3.5" rx="1" fill="white" stroke="none"/>
+    </svg>
+  </div>
+  <h2>Enable Camera</h2>
+  <p id="perm-dest-line">To: —</p>
+  <p>This app needs your camera to overlay AR navigation arrows on the real corridors as you walk.</p>
+  <button class="btn-allow" onclick="requestCameraAndStart()">
+    Allow Camera & Begin Navigation
+  </button>
+  <p class="perm-note">When your browser asks "Allow camera access?" — tap <strong style="color:rgba(255,255,255,.7)">Allow</strong>. Your camera is only used for AR navigation and nothing else.</p>
+</div>
+
+<!-- ═══════════════════════════════ -->
+<!-- SCREEN 4 — LOADING AR ENGINE   -->
+<!-- ═══════════════════════════════ -->
+<div id="s-loading" class="screen">
+  <div class="spinner"></div>
+  <h2>Starting AR Camera…</h2>
+  <p>Point your camera toward the entrance wall to begin navigation.</p>
+</div>
+
+<!-- ═══════════════════════════════ -->
+<!-- SCREEN 5 — AR SCENE            -->
+<!-- ═══════════════════════════════ -->
+<div id="s-ar" class="screen">
+  <div id="ar-container"></div>
+
+  <div id="hud">
+    <div id="hud-top">
+      <div id="floor-pill">🏢 Ground Floor</div>
+      <div id="step-label">Step 1 of 4</div>
+      <div id="step-instr">Point camera toward the entrance</div>
+      <div id="dist-pill">📍 <span id="dist-text">At entrance gate</span></div>
+    </div>
+
+    <div id="detect-flash">
+      <p id="flash-title">Marker Detected ✓</p>
+      <span id="flash-sub">Follow the AR arrows</span>
+    </div>
+
+    <div id="hud-bottom">
+      <div id="prog-dots"></div>
+      <div id="scan-prompt">
+        <p id="prompt-main">Scan the marker at the entrance</p>
+        <span id="prompt-sub">Point your camera toward the printed marker on the wall</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="transit-modal">
+    <div class="transit-card">
+      <div class="transit-emoji" id="transit-emoji">🛗</div>
+      <h3 id="transit-title">Take the Lift</h3>
+      <p id="transit-body">Press the button for your floor and get in.</p>
+      <button onclick="dismissTransitModal()">Got it</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ -->
+<!-- SCREEN 6 — ARRIVED             -->
+<!-- ═══════════════════════════════ -->
+<div id="s-arrived" class="screen">
+  <div class="arrived-icon">
+    <svg viewBox="0 0 52 52" fill="none" stroke="#00C49A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14 27l9 9 16-18"/>
+      <circle cx="26" cy="26" r="22" stroke-opacity="0.35"/>
+    </svg>
+  </div>
+  <h2>You have arrived!</h2>
+  <div class="arr-name" id="arr-name">—</div>
+  <div class="arr-room" id="arr-room"></div>
+  <p class="arr-sub">Please check in at the counter.</p>
+  <button class="btn-restart" onclick="restart()">↩ Back to Home</button>
+</div>
+
+<script type="module">
+import * as THREE from "three";
+import { MindARThree } from "mindar-image-three";
+
+// ═══════════════════════════════════════════════════════════════
+// 1. SHARED INSTRUCTION SNIPPETS
+//    (defined once, reused across nodes/variants that show identical text —
+//    purely to avoid retyping; edit here if wording needs to change)
+// ═══════════════════════════════════════════════════════════════
+const RECEPTION_LEFT = { arrow:'left', title:'TURN LEFT', sub:'Head to the stairs up to the 1st floor',
+  dist:'Stairs are just ahead on your left', prompt:'Scan the marker at reception',
+  promptSub:'Point camera toward the reception wall',
+  flash:'Reception Marker Detected ✓', flashSub:'Turn left toward the stairs' };
+
+const RECEPTION_STRAIGHT = { arrow:'straight', title:'CONTINUE STRAIGHT', sub:'Head through the gate into the corridor',
+  dist:'~5m through the gate', prompt:'Scan the marker at reception',
+  promptSub:'Point camera toward the reception wall',
+  flash:'Reception Marker Detected ✓', flashSub:'Continue straight ahead' };
+
+const CORR_END_STRAIGHT = { arrow:'straight', title:'CONTINUE STRAIGHT', sub:'Continue past the turn, toward the lift',
+  dist:'~3m to the lift', prompt:'Scan the corridor marker',
+  promptSub:'Point camera down the corridor',
+  flash:'Marker Detected ✓', flashSub:'Continue straight to the lift' };
+
+// ═══════════════════════════════════════════════════════════════
+// 2. THE MARKER GRAPH — 15 physical markers, defined once.
+//    variant keys can be either "<destId>_<route>" (when the SAME
+//    destination needs different text depending on which route was
+//    chosen — e.g. reception, since Location 1 behaves differently
+//    via stairs vs via lift) or plain "<destId>" (when the text only
+//    depends on the destination, not the route).
+// ═══════════════════════════════════════════════════════════════
+const NODES = {
+  ENT: {
+    targetIndex: 0, type: 'walk', floorLabel: '🏢 Ground Floor',
+    default: { arrow:'straight', title:'WALK STRAIGHT', sub:'Head toward reception',
+      dist:'~8m to reception', prompt:'Scan the marker at the entrance',
+      promptSub:'Point camera toward the entrance wall',
+      flash:'Marker Detected ✓', flashSub:'Walk straight ahead' }
+  },
+
+  RECEPTION: {
+    targetIndex: 1, type: 'branch', floorLabel: '🏢 Ground Floor',
+    variants: {
+      d1_stairs: RECEPTION_LEFT,
+      d2_stairs: RECEPTION_LEFT,
+      d1_lift:   RECEPTION_STRAIGHT,
+      d2_lift:   RECEPTION_STRAIGHT,
+      d3: RECEPTION_STRAIGHT,
+      d4: RECEPTION_STRAIGHT,
+      d5: RECEPTION_STRAIGHT,
+      d6: RECEPTION_STRAIGHT
+    }
+  },
+
+  CORR_END: {
+    targetIndex: 2, type: 'branch', floorLabel: '🏢 Ground Floor',
+    variants: {
+      d3: { arrow:'right', title:'TURN RIGHT', sub:'Head toward Location 3',
+        dist:'~6m to destination', prompt:'Scan the corridor marker',
+        promptSub:'Point camera down the corridor',
+        flash:'Marker Detected ✓', flashSub:'Turn right' },
+      d1_lift: CORR_END_STRAIGHT,
+      d2_lift: CORR_END_STRAIGHT,
+      d4: CORR_END_STRAIGHT,
+      d5: CORR_END_STRAIGHT,
+      d6: CORR_END_STRAIGHT
+    }
+  },
+
+  LOC3_ARRIVE: {
+    targetIndex: 3, type: 'arrive', floorLabel: '🏢 Ground Floor',
+    default: { prompt:'Scan the marker near the door', promptSub:'Point camera at the door marker',
+      flash:'You\'re close ✓', flashSub:'Destination just ahead' }
+  },
+
+  LIFT_G: {
+    targetIndex: 4, type: 'lift_enter', floorLabel: '🏢 Ground Floor',
+    variants: {
+      d1: { transitTitle:'Take the Lift to the 1st Floor', transitBody:'Press the button for Floor 1. Once the doors open, turn left and walk to the end of the corridor.',
+        prompt:'Scan the marker at the lift', promptSub:'Point camera toward the lift lobby wall',
+        flash:'Lift Lobby Detected ✓', flashSub:'Take the lift to Floor 1' },
+      d2: { transitTitle:'Take the Lift to the 1st Floor', transitBody:'Press the button for Floor 1. Once the doors open, turn left and walk to the end of the corridor.',
+        prompt:'Scan the marker at the lift', promptSub:'Point camera toward the lift lobby wall',
+        flash:'Lift Lobby Detected ✓', flashSub:'Take the lift to Floor 1' },
+      d4: { transitTitle:'Take the Lift to the 2nd Floor', transitBody:'Press the button for Floor 2. Once the doors open, turn left into the corridor.',
+        prompt:'Scan the marker at the lift', promptSub:'Point camera toward the lift lobby wall',
+        flash:'Lift Lobby Detected ✓', flashSub:'Take the lift to Floor 2' },
+      d5: { transitTitle:'Take the Lift to the 2nd Floor', transitBody:'Press the button for Floor 2. Once the doors open, turn left into the corridor.',
+        prompt:'Scan the marker at the lift', promptSub:'Point camera toward the lift lobby wall',
+        flash:'Lift Lobby Detected ✓', flashSub:'Take the lift to Floor 2' },
+      d6: { transitTitle:'Take the Lift to the 2nd Floor', transitBody:'Press the button for Floor 2. Once the doors open, turn left into the corridor.',
+        prompt:'Scan the marker at the lift', promptSub:'Point camera toward the lift lobby wall',
+        flash:'Lift Lobby Detected ✓', flashSub:'Take the lift to Floor 2' }
+    }
+  },
+
+  LIFT_EXIT_1: {
+    targetIndex: 5, type: 'lift_exit', floorLabel: '🏢 1st Floor',
+    default: { arrow:'left', title:'TURN LEFT', sub:'Walk to the end of the corridor',
+      dist:'~toward the branch point', prompt:'Scan the marker near the lift exit',
+      promptSub:'Point camera toward the lift exit wall',
+      flash:'You\'re on the 1st Floor ✓', flashSub:'Turn left' }
+  },
+
+  STAIRS_FOOT: {
+    targetIndex: 6, type: 'stairs_enter', floorLabel: '🏢 Ground Floor',
+    default: { transitTitle:'Take the Stairs to the 1st Floor', transitBody:'Walk up the stairs. Once at the top, continue straight — point your camera down the corridor.',
+      prompt:'Scan the marker at the foot of the stairs', promptSub:'Point camera toward the stairs',
+      flash:'Stairs Detected ✓', flashSub:'Walk up the stairs' }
+  },
+
+  STAIRS_TOP: {
+    targetIndex: 7, type: 'stairs_exit', floorLabel: '🏢 1st Floor',
+    default: { arrow:'straight', title:'WALK STRAIGHT', sub:'Head to the end of the corridor',
+      dist:'~toward the branch point', prompt:'Scan the marker at the top of the stairs',
+      promptSub:'Point camera down the corridor',
+      flash:'You\'re on the 1st Floor ✓', flashSub:'Walk straight ahead' }
+  },
+
+  F1_BRANCH: {
+    targetIndex: 8, type: 'branch', floorLabel: '🏢 1st Floor',
+    variants: {
+      d1: { arrow:'left', title:'TURN LEFT', sub:'Location 1 is just ahead',
+        dist:'~a few steps', prompt:'Scan the branch marker',
+        promptSub:'Point camera toward the corridor junction',
+        flash:'Marker Detected ✓', flashSub:'Turn left' },
+      d2: { arrow:'right', title:'TURN RIGHT', sub:'Location 2 is just ahead',
+        dist:'~a few steps', prompt:'Scan the branch marker',
+        promptSub:'Point camera toward the corridor junction',
+        flash:'Marker Detected ✓', flashSub:'Turn right' }
+    }
+  },
+
+  LOC1_ARRIVE: {
+    targetIndex: 9, type: 'arrive', floorLabel: '🏢 1st Floor',
+    default: { prompt:'Scan the marker near the door', promptSub:'Point camera at the door marker',
+      flash:'You\'re close ✓', flashSub:'Destination just ahead' }
+  },
+  LOC2_ARRIVE: {
+    targetIndex: 10, type: 'arrive', floorLabel: '🏢 1st Floor',
+    default: { prompt:'Scan the marker near the door', promptSub:'Point camera at the door marker',
+      flash:'You\'re close ✓', flashSub:'Destination just ahead' }
+  },
+
+  LIFT_EXIT_2: {
+    targetIndex: 11, type: 'lift_exit', floorLabel: '🏢 2nd Floor',
+    default: { arrow:'left', title:'TURN LEFT', sub:'Walk into the corridor',
+      dist:'~toward Location 4 & 5', prompt:'Scan the marker near the lift exit',
+      promptSub:'Point camera toward the lift exit wall',
+      flash:'You\'re on the 2nd Floor ✓', flashSub:'Turn left' }
+  },
+
+  // Same physical marker serves BOTH Location 4 and Location 5, since they're
+  // at (practically) the same spot. The arrival card text is filled in
+  // dynamically from DEST_DISPLAY at build time, so this node needs no variants.
+  LOC45_ARRIVE: {
+    targetIndex: 12, type: 'arrive', floorLabel: '🏢 2nd Floor',
+    default: { prompt:'Scan the marker near the door', promptSub:'Point camera at the door marker',
+      flash:'You\'re close ✓', flashSub:'Destination just ahead' }
+  },
+
+  F2_CORR: {
+    targetIndex: 13, type: 'walk', floorLabel: '🏢 2nd Floor',
+    default: { arrow:'straight', title:'CONTINUE STRAIGHT', sub:'Past DG sir\'s room and meeting hall, to the end of the corridor',
+      dist:'~toward Location 6', prompt:'Scan the corridor marker',
+      promptSub:'Point camera down the corridor',
+      flash:'Marker Detected ✓', flashSub:'Continue straight' }
+  },
+
+  LOC6_ARRIVE: {
+    targetIndex: 14, type: 'arrive', floorLabel: '🏢 2nd Floor',
+    default: { prompt:'Scan the marker near the door', promptSub:'Point camera at the door marker',
+      flash:'You\'re close ✓', flashSub:'Destination just ahead' }
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════
+// 3. ROUTES — the only thing that changes if the building layout
+//    changes. Destinations with two ways in use "routes: {stairs,lift}";
+//    everything else uses a single "path".
+// ═══════════════════════════════════════════════════════════════
+const DESTINATIONS = {
+  d1: {
+    routes: {
+      stairs: ['ENT','RECEPTION','STAIRS_FOOT','STAIRS_TOP','F1_BRANCH','LOC1_ARRIVE'],
+      lift:   ['ENT','RECEPTION','CORR_END','LIFT_G','LIFT_EXIT_1','F1_BRANCH','LOC1_ARRIVE']
+    }
+  },
+  d2: {
+    routes: {
+      stairs: ['ENT','RECEPTION','STAIRS_FOOT','STAIRS_TOP','F1_BRANCH','LOC2_ARRIVE'],
+      lift:   ['ENT','RECEPTION','CORR_END','LIFT_G','LIFT_EXIT_1','F1_BRANCH','LOC2_ARRIVE']
+    }
+  },
+  d3: { path: ['ENT','RECEPTION','CORR_END','LOC3_ARRIVE'] },
+  d4: { path: ['ENT','RECEPTION','CORR_END','LIFT_G','LIFT_EXIT_2','LOC45_ARRIVE'] },
+  d5: { path: ['ENT','RECEPTION','CORR_END','LIFT_G','LIFT_EXIT_2','LOC45_ARRIVE'] },
+  d6: { path: ['ENT','RECEPTION','CORR_END','LIFT_G','LIFT_EXIT_2','F2_CORR','LOC6_ARRIVE'] }
+};
+
+function getPath(destId, route){
+  const dest = DESTINATIONS[destId];
+  return dest.routes ? dest.routes[route] : dest.path;
+}
+
+function getContent(nodeId, destId, route){
+  const node = NODES[nodeId];
+  if (!node.variants) return node.default;
+  const specificKey = route ? (destId + '_' + route) : null;
+  if (specificKey && node.variants[specificKey]) return node.variants[specificKey];
+  if (node.variants[destId]) return node.variants[destId];
+  return node.default;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 4. RUNTIME STATE
+// ═══════════════════════════════════════════════════════════════
+let currentStepIndex = -1;
+let arStarted = false;
+let mindarThree = null;
+let activeSteps = [];
+let activeDestId = null;
+
+window.initAR = async function(destId, route){
+  if (arStarted) return;
+  arStarted = true;
+  activeDestId = destId;
+
+  const path = getPath(destId, route);
+  activeSteps = path.map(nodeId => ({
+    nodeId,
+    node: NODES[nodeId],
+    content: getContent(nodeId, destId, route)
+  }));
+  currentStepIndex = -1;
+
+  showScreen('s-ar');
+  buildProgressDots();
+
+  mindarThree = new MindARThree({
+    container: document.querySelector("#ar-container"),
+    imageTargetSrc: "./targets.mind",
+    filterMinCF: 0.0001,
+    filterBeta: 1000,
+    warmupTolerance: 2,
+    missTolerance: 5
+  });
+
+  const { renderer, scene, camera } = mindarThree;
+  const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.6);
+  scene.add(light);
+
+  const display = window.DEST_DISPLAY[destId];
+
+  activeSteps.forEach((step, i) => {
+    const anchor = mindarThree.addAnchor(step.node.targetIndex);
+    const t = step.node.type;
+
+    if (t === 'walk' || t === 'branch' || t === 'lift_exit' || t === 'stairs_exit') {
+      anchor.group.add(buildArrowGroup(step.content.arrow, step.content.title, step.content.sub, 0x00C49A));
+    } else if (t === 'arrive') {
+      anchor.group.add(buildArrivalGroup(display.name, display.room));
+    }
+    // lift_enter / stairs_enter get no 3D content — a modal card is shown instead.
+
+    anchor.onTargetFound = () => onStepReached(i);
+  });
+
+  await mindarThree.start();
+  renderer.setAnimationLoop(() => renderer.render(scene, camera));
+};
+
+window.stopAR = function(){
+  if (mindarThree) {
+    try { mindarThree.stop(); } catch(e) {}
+    mindarThree = null;
+  }
+  arStarted = false;
+  document.getElementById('transit-modal').classList.remove('show');
+};
+
+// ═══════════════════════════════════════════════════════════════
+// 5. STEP PROGRESSION
+// ═══════════════════════════════════════════════════════════════
+function onStepReached(i){
+  if (i < currentStepIndex) return;
+  currentStepIndex = i;
+  const step = activeSteps[i];
+  updateHUD(i);
+  showFlash(step.content.flash, step.content.flashSub);
+
+  if (step.node.type === 'lift_enter' || step.node.type === 'stairs_enter') {
+    document.getElementById('transit-emoji').textContent = step.node.type === 'lift_enter' ? '🛗' : '🪜';
+    document.getElementById('transit-title').textContent = step.content.transitTitle;
+    document.getElementById('transit-body').textContent = step.content.transitBody;
+    document.getElementById('transit-modal').classList.add('show');
+  }
+
+  if (step.node.type === 'arrive') {
+    setTimeout(() => {
+      const display = window.DEST_DISPLAY[activeDestId];
+      document.getElementById('arr-name').textContent = display.name;
+      document.getElementById('arr-room').textContent = display.room || '';
+      showScreen('s-arrived');
+    }, 4000);
+  }
+}
+
+function buildProgressDots(){
+  const wrap = document.getElementById('prog-dots');
+  wrap.innerHTML = '';
+  activeSteps.forEach((_, i) => {
+    const d = document.createElement('div');
+    d.className = 'dot';
+    d.id = 'dot-' + i;
+    wrap.appendChild(d);
+  });
+}
+
+function updateHUD(idx){
+  const step = activeSteps[idx];
+  const c = step.content;
+  document.getElementById('floor-pill').textContent = step.node.floorLabel;
+  document.getElementById('step-label').textContent = 'Step ' + (idx+1) + ' of ' + activeSteps.length;
+  document.getElementById('step-instr').textContent =
+    (step.node.type === 'lift_enter' || step.node.type === 'stairs_enter') ? c.transitTitle
+    : (c.title || 'You have arrived');
+  document.getElementById('dist-text').textContent = c.dist || 'Almost there';
+  document.getElementById('prompt-main').textContent = c.prompt;
+  document.getElementById('prompt-sub').textContent = c.promptSub;
+
+  activeSteps.forEach((_, i) => {
+    const d = document.getElementById('dot-'+i);
+    if (!d) return;
+    d.className = 'dot' + (i<idx?' done':i===idx?' active':'');
+  });
+}
+
+function showFlash(title, sub){
+  const f = document.getElementById('detect-flash');
+  document.getElementById('flash-title').textContent = title;
+  document.getElementById('flash-sub').textContent = sub;
+  f.classList.add('show');
+  setTimeout(()=>f.classList.remove('show'), 2800);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 6. 3D CONTENT BUILDERS (unchanged logic from before)
+// ═══════════════════════════════════════════════════════════════
+function buildArrowGroup(direction, titleText, subText, colorHex){
+  const group = new THREE.Group();
+  const mat = new THREE.MeshBasicMaterial({ color: colorHex });
+
+  let shaftPos, headPos, ringPos, rot;
+  if (direction === 'left') {
+    shaftPos = [-0.4, 0.3, -0.3]; headPos = [-0.8, 0.3, -0.3]; ringPos = [-0.4, 0.3, -0.3];
+    rot = { shaft:'z', headAngle: Math.PI/2 };
+  } else if (direction === 'right') {
+    shaftPos = [0.4, 0.3, -0.3]; headPos = [0.8, 0.3, -0.3]; ringPos = [0.4, 0.3, -0.3];
+    rot = { shaft:'z', headAngle: -Math.PI/2 };
+  } else {
+    shaftPos = [0, 0.3, -0.5]; headPos = [0, 0.3, -0.9]; ringPos = [0, 0.3, -0.5];
+    rot = { shaft:'x', headAngle: null };
+  }
+
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.7, 16), mat);
+  shaft.position.set(...shaftPos);
+  if (rot.shaft === 'x') shaft.rotation.x = Math.PI/2; else shaft.rotation.z = Math.PI/2;
+  group.add(shaft);
+
+  const head = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.25, 16), mat);
+  head.position.set(...headPos);
+  if (rot.shaft === 'x') head.rotation.x = Math.PI/2; else head.rotation.z = rot.headAngle;
+  group.add(head);
+
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.016, 8, 32), mat);
+  ring.position.set(...ringPos);
+  group.add(ring);
+  animatePulse(ring);
+
+  const labelX = direction === 'straight' ? 0 : shaftPos[0];
+  group.add(makeTextPlane(titleText, 1.5, 0.28, "#003580", "#FFFFFF", labelX, 0.72, shaftPos[2]));
+  group.add(makeTextPlane(subText, 1.9, 0.22, "rgba(0,0,0,0)", "#00C49A", labelX, 0.45, shaftPos[2], true));
+
+  return group;
+}
+
+function buildArrivalGroup(destName, destRoom){
+  const group = new THREE.Group();
+  const mat = new THREE.MeshBasicMaterial({ color: 0xFFAA00 });
+
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.02, 8, 32), mat);
+  ring.position.set(0, 0.5, -0.4);
+  group.add(ring);
+  animatePulse(ring);
+
+  group.add(makeTextPlane("YOU'RE HERE", 1.5, 0.26, "#003580", "#FFFFFF", 0, 0.82, -0.4));
+  group.add(makeTextPlane(destName, 1.7, 0.28, "#003580", "#FFFFFF", 0, 0.5, -0.4));
+  if (destRoom) {
+    group.add(makeTextPlane(destRoom, 1.5, 0.24, "#003580", "#00C49A", 0, 0.26, -0.4));
+  }
+
+  return group;
+}
+
+function animatePulse(mesh){
+  let t = 0;
+  function tick(){
+    t += 0.04;
+    const s = 1 + 0.25 * Math.sin(t);
+    mesh.scale.set(s, s, 1);
+    requestAnimationFrame(tick);
+  }
+  tick();
+}
+
+function makeTextPlane(text, w, h, bgColor, textColor, x, y, z, transparentBg){
+  const canvas = document.createElement('canvas');
+  canvas.width = 512; canvas.height = Math.round(512 * (h/w));
+  const ctx = canvas.getContext('2d');
+  if(!transparentBg){
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+  }
+  ctx.fillStyle = textColor;
+  ctx.font = "bold 48px Segoe UI, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, canvas.width/2, canvas.height/2);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+  const mat = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
+  const plane = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+  plane.position.set(x, y, z);
+  return plane;
+}
+</script>
+</body>
+</html>
