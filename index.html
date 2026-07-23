@@ -655,38 +655,73 @@ window.initAR = async function(destId, route){
   showScreen('s-ar');
   buildProgressDots();
 
-  mindarThree = new MindARThree({
-    container: document.querySelector("#ar-container"),
-    imageTargetSrc: "./targets.mind",
-    filterMinCF: 0.0001,
-    filterBeta: 1000,
-    warmupTolerance: 2,
-    missTolerance: 5
-  });
+  try {
+    mindarThree = new MindARThree({
+      container: document.querySelector("#ar-container"),
+      imageTargetSrc: "./targets.mind",
+      filterMinCF: 0.0001,
+      filterBeta: 1000,
+      warmupTolerance: 2,
+      missTolerance: 5
+    });
 
-  const { renderer, scene, camera } = mindarThree;
-  const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.6);
-  scene.add(light);
+    const { renderer, scene, camera } = mindarThree;
+    const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.6);
+    scene.add(light);
 
-  const display = window.DEST_DISPLAY[destId];
+    const display = window.DEST_DISPLAY[destId];
 
-  activeSteps.forEach((step, i) => {
-    const anchor = mindarThree.addAnchor(step.node.targetIndex);
-    const t = step.node.type;
+    activeSteps.forEach((step, i) => {
+      const anchor = mindarThree.addAnchor(step.node.targetIndex);
+      const t = step.node.type;
 
-    if (t === 'walk' || t === 'branch' || t === 'lift_exit' || t === 'stairs_exit') {
-      anchor.group.add(buildArrowGroup(step.content.arrow, step.content.title, step.content.sub, 0x00C49A));
-    } else if (t === 'arrive') {
-      anchor.group.add(buildArrivalGroup(display.name, display.room));
-    }
-    // lift_enter / stairs_enter get no 3D content — a modal card is shown instead.
+      if (t === 'walk' || t === 'branch' || t === 'lift_exit' || t === 'stairs_exit') {
+        anchor.group.add(buildArrowGroup(step.content.arrow, step.content.title, step.content.sub, 0x00C49A));
+      } else if (t === 'arrive') {
+        anchor.group.add(buildArrivalGroup(display.name, display.room));
+      }
+      // lift_enter / stairs_enter get no 3D content — a modal card is shown instead.
 
-    anchor.onTargetFound = () => onStepReached(i);
-  });
+      anchor.onTargetFound = () => onStepReached(i);
+    });
 
-  await mindarThree.start();
-  renderer.setAnimationLoop(() => renderer.render(scene, camera));
+    await mindarThree.start();
+    renderer.setAnimationLoop(() => renderer.render(scene, camera));
+
+    // Watchdog: if MindAR reports success but the <video> element never
+    // actually starts playing frames, that's the "black screen" symptom —
+    // flag it explicitly rather than leaving you staring at nothing.
+    setTimeout(() => {
+      const vid = document.querySelector('#ar-container video');
+      if (!vid) {
+        showOnScreenError('No <video> element was created by MindAR. The camera stream never attached.');
+      } else if (vid.readyState === 0 || vid.videoWidth === 0) {
+        showOnScreenError('Camera video element exists but has no frames (readyState=' + vid.readyState
+          + ', videoWidth=' + vid.videoWidth + '). Likely a camera permission or hardware access issue — '
+          + 'check Chrome\'s site settings (padlock icon) → Camera → Allow, then reload.');
+      }
+    }, 3000);
+
+  } catch (err) {
+    // Surface the real error on-screen instead of failing silently —
+    // this is what you'd otherwise only see via remote USB debugging.
+    arStarted = false;
+    showOnScreenError('AR failed to start:\n' + (err && err.message ? err.message : String(err)));
+  }
 };
+
+function showOnScreenError(msg){
+  let box = document.getElementById('ar-error-box');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'ar-error-box';
+    box.style.cssText = 'position:absolute;left:16px;right:16px;bottom:16px;z-index:2000;'
+      + 'background:#B00020;color:#fff;padding:14px 16px;border-radius:12px;'
+      + 'font-size:12.5px;line-height:1.5;white-space:pre-wrap;font-family:monospace;';
+    document.getElementById('s-ar').appendChild(box);
+  }
+  box.textContent = msg;
+}
 
 window.stopAR = function(){
   if (mindarThree) {
