@@ -135,6 +135,17 @@
     #detect-flash p{font-size:17px;font-weight:800;color:#fff;}
     #detect-flash span{font-size:12.5px;color:rgba(255,255,255,.85);}
     #detect-flash.show{opacity:1;}
+
+    /* ── PERSISTENT DIRECTION ARROW — fixed to the screen, not the camera
+         feed. Unlike the 3D AR arrow (only visible while its marker is in
+         view), this stays on screen continuously between detections, same
+         idea as a walking-navigation app's floating arrow. ── */
+    #persistent-arrow{position:absolute;left:50%;top:62%;
+      transform:translate(-50%,-50%) rotate(0deg);
+      width:84px;height:84px;z-index:1000;pointer-events:none;
+      transition:transform .35s ease;filter:drop-shadow(0 4px 14px rgba(0,0,0,.5));}
+    #persistent-arrow.hidden{display:none;}
+    #persistent-arrow svg{width:100%;height:100%;}
     #prog-dots{display:flex;gap:6px;justify-content:center;margin-bottom:12px;flex-wrap:wrap;}
     .dot{width:8px;height:8px;border-radius:4px;background:rgba(255,255,255,.3);transition:all .3s;}
     .dot.active{width:24px;background:var(--green);}
@@ -379,6 +390,13 @@
     <div id="detect-flash">
       <p id="flash-title">Marker Detected ✓</p>
       <span id="flash-sub">Follow the AR arrows</span>
+    </div>
+
+    <div id="persistent-arrow" class="hidden">
+      <svg viewBox="0 0 100 100" fill="none">
+        <path d="M50 8 L82 46 L62 46 L62 92 L38 92 L38 46 L18 46 Z"
+          fill="#00C49A" stroke="#003580" stroke-width="4" stroke-linejoin="round"/>
+      </svg>
     </div>
 
     <div id="hud-bottom">
@@ -656,6 +674,7 @@ window.initAR = async function(destId, route){
 
   showScreen('s-ar');
   buildProgressDots();
+  document.getElementById('persistent-arrow').classList.add('hidden');
 
   try {
     mindarThree = new MindARThree({
@@ -791,6 +810,22 @@ function updateHUD(idx){
     if (!d) return;
     d.className = 'dot' + (i<idx?' done':i===idx?' active':'');
   });
+
+  updatePersistentArrow(step.node.type, c.arrow);
+}
+
+function updatePersistentArrow(nodeType, direction){
+  const el = document.getElementById('persistent-arrow');
+  // Arrival, lift, and stairs steps have nothing sensible for a walking
+  // arrow to point toward — hide it (the arrival card / transit modal
+  // covers those moments instead).
+  if (nodeType === 'arrive' || nodeType === 'lift_enter' || nodeType === 'stairs_enter' || !direction) {
+    el.classList.add('hidden');
+    return;
+  }
+  el.classList.remove('hidden');
+  const deg = direction === 'left' ? -90 : direction === 'right' ? 90 : 0;
+  el.style.transform = 'translate(-50%,-50%) rotate(' + deg + 'deg)';
 }
 
 function showFlash(title, sub){
