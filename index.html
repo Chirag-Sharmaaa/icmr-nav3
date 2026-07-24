@@ -134,6 +134,32 @@
       text-align:center;opacity:0;transition:opacity .3s;pointer-events:none;max-width:82%;}
     #detect-flash p{font-size:17px;font-weight:800;color:#fff;}
     #detect-flash span{font-size:12.5px;color:rgba(255,255,255,.85);}
+    /* ── WELCOME / NAME CAPTURE (assistant's entry point) ── */
+    #s-welcome{background:linear-gradient(160deg,var(--blue),var(--blue2));
+      align-items:center;justify-content:center;text-align:center;padding:40px;gap:16px;}
+    .welcome-icon{width:84px;height:84px;border-radius:50%;background:rgba(255,255,255,.12);
+      display:flex;align-items:center;justify-content:center;font-size:38px;
+      border:2px solid rgba(255,255,255,.3);}
+    #s-welcome h1{font-size:22px;font-weight:700;color:#fff;}
+    #welcome-sub{font-size:13.5px;color:rgba(255,255,255,.75);max-width:280px;line-height:1.5;}
+    #name-entry{display:none;width:100%;max-width:300px;flex-direction:column;gap:12px;margin-top:6px;}
+    .name-input-row{display:flex;gap:8px;}
+    #name-input{flex:1;padding:14px 16px;border-radius:12px;border:none;font-size:14.5px;
+      background:rgba(255,255,255,.95);color:var(--text);}
+    .mic-btn{width:48px;height:48px;border-radius:12px;border:2px solid rgba(255,255,255,.3);
+      background:rgba(255,255,255,.1);font-size:19px;cursor:pointer;flex-shrink:0;
+      -webkit-tap-highlight-color:transparent;}
+    .mic-btn.listening{background:var(--green);border-color:var(--green);animation:pulseGlow 1s infinite;}
+    @keyframes pulseGlow{0%,100%{opacity:1;}50%{opacity:.55;}}
+
+    /* ── ASK ASSISTANT — floating button, always available during navigation ── */
+    #ask-btn{position:absolute;right:18px;bottom:110px;z-index:1500;pointer-events:auto;
+      width:58px;height:58px;border-radius:50%;background:var(--blue2);
+      border:2px solid rgba(255,255,255,.4);color:#fff;font-size:22px;cursor:pointer;
+      display:flex;align-items:center;justify-content:center;
+      box-shadow:0 4px 14px rgba(0,0,0,.4);-webkit-tap-highlight-color:transparent;}
+    #ask-btn.listening{background:var(--green);animation:pulseGlow 1s infinite;}
+
     #detect-flash.show{opacity:1;}
 
     /* ── PERSISTENT DIRECTION ARROW — fixed to the screen, not the camera
@@ -207,6 +233,62 @@
 
   let selectedDestId = null;
   let selectedRoute = null; // 'stairs' | 'lift' | null
+  let userName = '';
+
+  // ═══════════════════════════════════════════════════════════════
+  // ASSISTANT — voice output (speak) and voice input (listen).
+  // Both are free, built into the browser (Web Speech API), no
+  // backend or API key needed. speak() is called from here AND from
+  // the AR module below (exposed on window) whenever a marker fires.
+  // ═══════════════════════════════════════════════════════════════
+  function speak(text){
+    if (!('speechSynthesis' in window)) return; // silently skip on unsupported browsers
+    window.speechSynthesis.cancel(); // don't let utterances queue/overlap
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.rate = 0.95;
+    utter.pitch = 1;
+    window.speechSynthesis.speak(utter);
+  }
+  window.speak = speak;
+
+  // Starts one round of voice listening. Calls onResult(transcript) if speech
+  // was recognized. Silently does nothing extra on error/no-support — the
+  // caller decides the fallback behaviour in that case.
+  function startListening(onResult, onDone){
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { if (onDone) onDone(); return; }
+    const rec = new SR();
+    rec.lang = 'en-IN';
+    rec.interimResults = false;
+    rec.maxAlternatives = 1;
+    rec.onresult = (e) => { onResult(e.results[0][0].transcript); };
+    rec.onerror = () => {};
+    rec.onend = () => { if (onDone) onDone(); };
+    try { rec.start(); } catch(e) { if (onDone) onDone(); }
+  }
+
+  function beginWelcome(){
+    document.getElementById('btn-tap-begin').style.display = 'none';
+    document.getElementById('welcome-sub').textContent = "Hi! I'm your ICMR navigation assistant.";
+    speak("Hi! I'm your ICMR navigation assistant. What's your name?");
+    document.getElementById('name-entry').style.display = 'flex';
+  }
+
+  function listenForName(){
+    const btn = document.getElementById('name-mic-btn');
+    btn.classList.add('listening');
+    startListening(
+      (transcript) => { document.getElementById('name-input').value = transcript; },
+      () => { btn.classList.remove('listening'); }
+    );
+  }
+
+  function submitName(){
+    const val = document.getElementById('name-input').value.trim();
+    userName = val || 'there';
+    speak('Hello ' + userName + ', welcome to the ICMR navigation experience. Please select a destination on your screen.');
+    showScreen('s-home');
+  }
 
   function showScreen(id){
     document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
@@ -281,18 +363,53 @@
     document.getElementById('transit-modal').classList.remove('show');
   }
 
+  // Tap-to-ask, available throughout navigation. Whatever the person says,
+  // the answer is always "here's where you are / what to do right now" —
+  // deterministic and reliable, since the app always knows the current step.
+  // No speech recognition needed for this to work correctly; listening is
+  // just there to make it feel conversational.
+  function askAssistant(){
+    const btn = document.getElementById('ask-btn');
+    const respond = () => {
+      btn.classList.remove('listening');
+      if (window.getCurrentInstruction) speak(window.getCurrentInstruction());
+    };
+    btn.classList.add('listening');
+    startListening(() => respond(), respond); // respond regardless of what was heard, or if unsupported
+  }
+
   function restart(){
     if (window.stopAR) window.stopAR();
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
     selectedDestId = null;
     selectedRoute = null;
-    showScreen('s-home');
+    showScreen('s-home'); // stay signed in with their name — no need to re-greet
   }
 </script>
 
 <!-- ═══════════════════════════════ -->
+<!-- SCREEN 0 — WELCOME / NAME CAPTURE (assistant's entry point) -->
+<!-- ═══════════════════════════════ -->
+<div id="s-welcome" class="screen active">
+  <div class="welcome-icon">🎙️</div>
+  <h1>ICMR Navigation Assistant</h1>
+  <p id="welcome-sub">Tap below to begin — I'll guide you the whole way.</p>
+
+  <button id="btn-tap-begin" class="btn-allow" style="max-width:260px;" onclick="beginWelcome()">🔊 Tap to Begin</button>
+
+  <div id="name-entry">
+    <div class="name-input-row">
+      <input type="text" id="name-input" placeholder="Type or speak your name"/>
+      <button id="name-mic-btn" class="mic-btn" onclick="listenForName()">🎤</button>
+    </div>
+    <button class="btn-allow" onclick="submitName()">Continue</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ -->
 <!-- SCREEN 1 — HOME / DESTINATION  -->
 <!-- ═══════════════════════════════ -->
-<div id="s-home" class="screen active">
+<div id="s-home" class="screen">
   <div class="home-top">
     <div class="logo-ring">
       <svg viewBox="0 0 38 38" fill="none">
@@ -378,6 +495,8 @@
 <!-- ═══════════════════════════════ -->
 <div id="s-ar" class="screen">
   <div id="ar-container"></div>
+
+  <button id="ask-btn" onclick="askAssistant()" title="Ask the assistant">🎤</button>
 
   <div id="hud">
     <div id="hud-top">
@@ -671,6 +790,7 @@ window.initAR = async function(destId, route){
     content: getContent(nodeId, destId, route)
   }));
   currentStepIndex = -1;
+  lastSpokenText = '';
 
   showScreen('s-ar');
   buildProgressDots();
@@ -758,12 +878,29 @@ window.stopAR = function(){
 // ═══════════════════════════════════════════════════════════════
 // 5. STEP PROGRESSION
 // ═══════════════════════════════════════════════════════════════
+let lastSpokenText = ''; // exposed to the Ask-Assistant button so it can re-speak the current step
+
+function buildSpokenText(step){
+  const c = step.content;
+  if (step.node.type === 'lift_enter' || step.node.type === 'stairs_enter') {
+    return c.transitTitle + '. ' + c.transitBody;
+  }
+  if (step.node.type === 'arrive') {
+    const display = window.DEST_DISPLAY[activeDestId];
+    return "You've arrived at " + display.name + (display.room ? (', ' + display.room) : '') + '. Please check in at the counter.';
+  }
+  return c.title + (c.sub ? ('. ' + c.sub) : '');
+}
+
 function onStepReached(i){
   if (i < currentStepIndex) return;
   currentStepIndex = i;
   const step = activeSteps[i];
   updateHUD(i);
   showFlash(step.content.flash, step.content.flashSub);
+
+  lastSpokenText = buildSpokenText(step);
+  if (window.speak) window.speak(lastSpokenText);
 
   if (step.node.type === 'lift_enter' || step.node.type === 'stairs_enter') {
     document.getElementById('transit-emoji').textContent = step.node.type === 'lift_enter' ? '🛗' : '🪜';
@@ -781,6 +918,11 @@ function onStepReached(i){
     }, 4000);
   }
 }
+
+// Used by the floating "Ask" button (see classic script) — always answers
+// with exactly where the person currently is in the route.
+window.getCurrentInstruction = () => lastSpokenText || 'Please point your camera at the nearest marker to continue.';
+
 
 function buildProgressDots(){
   const wrap = document.getElementById('prog-dots');
