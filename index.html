@@ -166,10 +166,10 @@
          feed. Unlike the 3D AR arrow (only visible while its marker is in
          view), this stays on screen continuously between detections, same
          idea as a walking-navigation app's floating arrow. ── */
-    #persistent-arrow{position:absolute;left:50%;top:62%;
+    #persistent-arrow{position:absolute;left:50%;top:58%;
       transform:translate(-50%,-50%) rotate(0deg);
-      width:84px;height:84px;z-index:1000;pointer-events:none;
-      transition:transform .35s ease;filter:drop-shadow(0 4px 14px rgba(0,0,0,.5));}
+      width:180px;height:180px;z-index:1000;pointer-events:none;
+      transition:transform .35s ease;filter:drop-shadow(0 6px 20px rgba(0,0,0,.55));}
     #persistent-arrow.hidden{display:none;}
     #persistent-arrow svg{width:100%;height:100%;}
     #prog-dots{display:flex;gap:6px;justify-content:center;margin-bottom:12px;flex-wrap:wrap;}
@@ -329,6 +329,7 @@
     if (d.routes) {
       document.getElementById('route-dest-line').textContent = d.name;
       showScreen('s-route');
+      speak('Great, ' + d.name + ' can be reached two ways. Please choose whichever suits you best — stairs or lift.');
     } else {
       showScreen('s-perm');
     }
@@ -551,6 +552,7 @@
   <div class="arr-name" id="arr-name">—</div>
   <div class="arr-room" id="arr-room"></div>
   <p class="arr-sub">Please check in at the counter.</p>
+  <p class="arr-sub" style="margin-top:2px;">Thank you for choosing this experience. See you again! You can close this tab now.</p>
   <button class="btn-restart" onclick="restart()">↩ Back to Home</button>
 </div>
 
@@ -795,6 +797,7 @@ window.initAR = async function(destId, route){
   showScreen('s-ar');
   buildProgressDots();
   document.getElementById('persistent-arrow').classList.add('hidden');
+  if (window.speak) window.speak('Scan the first marker beside the QR code to start this navigation.');
 
   try {
     mindarThree = new MindARThree({
@@ -915,6 +918,7 @@ function onStepReached(i){
       document.getElementById('arr-name').textContent = display.name;
       document.getElementById('arr-room').textContent = display.room || '';
       showScreen('s-arrived');
+      if (window.speak) window.speak('Thank you for choosing this experience. See you again! You can close this tab now.');
     }, 4000);
   }
 }
